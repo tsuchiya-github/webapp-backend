@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0.27
+    container_name: webapp-backend-container-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dbname
+      MYSQL_USER: user
+      MYSQL_PASS: pass
+      TZ: Asia/Tokyo
+      LANG: 'C.UTF-8'
+    ports:
+      - '3306:3306'
+    platform: linux/amd64
+    networks:
+      - default
+    volumes:
+      - ./docker/db/conf:/etc/mysql/conf.d:ro
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+      - ./docker/db/logs:/var/log/mysql:rw
+
+  localstack:
+    image: localstack/localstack:0.13.3
+    platform: linux/amd64
+    container_name: webapp-backend-container-localstack
+    environment:
+      # SERVICES: 's3'
+      DEFAULT_REGION: 'ap-northeast-1'
+      HOSTNAME: 'localstack'
+      HOSTNAME_EXTERNAL: 'localstack'
+      INIT_SCRIPTS_PATH: /docker-entrypoint-initaws.d
+      DATA_DIR: /tmp/localstack/data
+    ports:
+      - '4566:4566'
+    volumes:
+      - ./docker/localstack/init:/docker-entrypoint-initaws.d:ro
+
+  golang:
+    image: webapp-backend/golang:latest
+    build:
+      dockerfile: docker/golang/Dockerfile
+    container_name: webapp-backend-container-golang
+    depends_on:
+      - db
+      - localstack
+    environment:
+      TZ: Asia/Tokyo
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: amd64
+    ports: 
+      - '4000:4000'
+    networks:
+      - default
+    volumes:
+      - .:/app:rw
+    working_dir: /app
+    tty: true
+
+  nginx:
+    image: nginx:latest
+    container_name: webapp-backend-container-nginx
+    depends_on:
+      - golang
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./docker/nginx/conf:/etc/nginx/conf.d:ro
+      - ./docker/nginx/cert:/etc/ssl/certs:ro
+
+networks:
+  default:
+    name: webapp-backend-networks-default

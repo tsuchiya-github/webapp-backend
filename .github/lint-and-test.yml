@@ -1,0 +1,45 @@
+name: Lint and test
+
+on:
+  push:
+    branches-ignore:
+      - dev
+      - prd
+
+jobs:
+  lint_and_test:
+    runs-on: ubuntu-latest
+
+    env:
+      TZ: Asia/Tokyo
+    
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+
+      - name: Cache go modules
+        uses: actions/cache@v2
+        with:
+          key: go-modules-${{ hashFiles('**/go.sum') }}
+          path: /go/pkg/mod
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Install tools
+        run: make tools
+      
+      - name: Exec lint command
+        run: make lint
+      
+      - name: Exec test command
+        run: make test
